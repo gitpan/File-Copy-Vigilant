@@ -1,6 +1,6 @@
 ---
 name: File-Copy-Vigilant
-version: 1.0
+version: 1.01
 author:
   - 'Anthony Kilna <anthony@kilna.com>'
 abstract: Copy and move files with verification and retries
@@ -14,9 +14,10 @@ build_requires:
   Data::Dumper: 0
   File::Temp: 0
   FindBin: 0
+  IO::File: 0
   Test::More: 0
 provides:
   File::Copy::Vigilant:
     file: lib/File/Copy/Vigilant.pm
-    version: 1.0
+    version: 1.01
 generated_by: Module::Build version 0.26

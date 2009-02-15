@@ -1,19 +1,22 @@
 
-use Test::More tests => 21;
+use Test::More tests => 24;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
 BEGIN {
-	use_ok( 'File::Copy::Vigilant', qw( copy_vigilant copy cp move_vigilant move mv ) );
+	use_ok(
+		'File::Copy::Vigilant',
+		qw( copy_vigilant copy cp move_vigilant move mv )
+	);
 	use_ok( 'File::Temp', qw(:POSIX) );
+	use_ok( 'IO::File' );
 }
-
-diag( "Testing File::Copy::Vigilant $File::Copy::Vigilant::VERSION, Perl $], $^X" );
 
 my $from_file = tmpnam();
 my $to_file = tmpnam();
 
-write_random_file_contents($from_file) || BAIL_OUT("Unable to write to $from_file");
+write_random_file_contents($from_file)
+  || BAIL_OUT("Unable to write to $from_file");
 
 # Test as copy_vigilant
 my ($success, @errors) = copy_vigilant($from_file, $to_file);
@@ -72,13 +75,28 @@ ok(!$success, "copy fails when destination is a filehandle");
 close $TMP;
 unlink $to_file;
 
-# Test with non-default retries of 3, fail attempt 1, 2, and 3, succeed on 3
+# Test with IO::File object for source
+$TMP = IO::File->new($from_file,'r');
+($success, @errors) = copy($TMP, $to_file);
+ok(!$success, "copy fails when source is an IO::File object");
+$TMP->close;
+
+# Test with IO::File object for dest
+$TMP = IO::File->new($from_file,'w');
+($success, @errors) = copy($from_file, $TMP);
+ok(!$success, "copy fails when destination is an IO::File object");
+$TMP->close;
+unlink $to_file;
+
+# Test with non-default retries of 3, fail attempt 1, 2, and 3, succeed on 4
 my $counter = 0;
 ($success, @errors) = copy(
 	$from_file,
 	$to_file,
 	'retries'   => 3,
-	'_postcopy' => sub { if (++$counter < 4) { write_random_file_contents($to_file); } }
+	'_postcopy' => sub {
+		if (++$counter < 4) { write_random_file_contents($to_file); }
+	}
 );
 $success || print STDERR '#', join('#', @errors);
 ok($success, "nonstandard retries, fail all tries except last one");
@@ -100,7 +118,8 @@ $success || print STDERR '#', join('#', @errors);
 ok($success, "copy with explicit check of md5");
 unlink $to_file;
 
-# Test md5 fails if we modify the destination file contents but not the size, no retries
+# Test md5 fails if we modify the destination file contents but not the
+# size, no retries
 ($success, @errors) = copy(
 	$from_file,
 	$to_file,
@@ -108,7 +127,10 @@ unlink $to_file;
 	'retries'   => 0,
 	'_postcopy' => sub { write_random_file_contents($to_file); }
 );
-ok(!$success, "fail when we modify the contents but not the size postcopy for md5");
+ok(
+	!$success,
+	"fail when we modify the contents but not the size postcopy for md5"
+);
 unlink $to_file;
 
 # Test md5 fails if we modify the destination file size, no retries
@@ -140,7 +162,8 @@ ok(!$success, "fail when we modify the size postcopy for size");
 unlink $to_file;
 
 # Test with compare for success
-($success, @errors) = copy_vigilant($from_file, $to_file, 'check' => 'compare');
+($success, @errors)
+	= copy_vigilant($from_file, $to_file, 'check' => 'compare');
 $success || print STDERR '#', join('#', @errors);
 ok($success, "copy with compare for success");
 unlink $to_file;
@@ -162,13 +185,14 @@ $success || print STDERR '#', join('#', @errors);
 ok($success, "copy with no check");
 unlink $to_file;
 
-sub write_random_file_contents {
-
+sub write_random_file_contents
+{
 	my $filename = shift;
 	my $size = defined(shift) || 1024 * 1024 * 4; # Default size 10MB
 
 	my $str = '';
-	foreach (0..$size) {
+	foreach (0..$size)
+	{
 		$str .= (0..9,'A'..'Z','a'..'z')[int rand 62];
 	}
 
@@ -178,5 +202,4 @@ sub write_random_file_contents {
 	close $OUT || return 0;
 	
 	return 1;
-
 }

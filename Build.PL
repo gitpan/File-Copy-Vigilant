@@ -11,6 +11,7 @@ my $builder = Module::Build->new(
         'Test::More'         => 0,
 		# 'Test::Perl::Critic' => 0, # This is a huge dependency, and only really needed during development
 		'File::Temp'         => 0,
+		'IO::File'           => 0,
 		'Data::Dumper'       => 0,
 		'FindBin'            => 0,
     },

@@ -4,10 +4,10 @@ use warnings;
 use strict;
 
 use base qw(Exporter);
-our @EXPORT = qw(copy_vigilant move_vigilant);
+our @EXPORT    = qw(copy_vigilant move_vigilant);
 our @EXPORT_OK = qw(copy move cp mv);
 
-use File::Copy qw(); # Don't import copy / move into the local namespace
+use File::Copy qw();    # Don't import copy / move into the local namespace
 use File::Compare;
 use Digest::MD5::File qw(file_md5_hex);
 
@@ -17,12 +17,11 @@ File::Copy::Vigilant - Copy and move files with verification and retries
 
 =head1 VERSION
 
-Version 1.0
+Version 1.01
 
 =cut
 
-our $VERSION = '1.0';
-
+our $VERSION = '1.01';
 
 =head1 SYNOPSIS
 
@@ -40,37 +39,45 @@ and destination file to ensure that the destination file is exactly the same
 as the source file upon completion.  If the copy or move fails for any reason
 it will attempt 2 retries by default.
 
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
 =head1 FUNCTIONS
 
-=head2 copy_vigilant copy cp
+=head2 copy_vigilant, copy, cp
 
 Copies a file, with post-copy verification and optional retries.  
 
-    copy_vigilant( $source, $destination, [ check => (checktype), ] [ retires => (retries) ]  );
+    copy_vigilant(
+        $source, $destination,
+        [ check => (checktype), ]
+        [ retires => (number of retries), ]
+    );
 
 "checktype" is one of the following:
 
-  md5     - Get the MD5 sum of the source before copying, and compare it to the MD5 of the destination after copying (default)
-  size    - Get the size of the source before copying, and compare it to the size of the destination after copying
-  compare - Perform a byte-for-byte comparison of the source and destination after copying
+  md5     - Get the MD5 sum of the source before copying, and compare it to
+            the MD5 of the destination after copying (default)
+  size    - Get the size of the source before copying, and compare it to the
+            size of the destination after copying
+  compare - Perform a byte-for-byte comparison of the source and destination
+            after copying
   none    - Do not perform a check of the source to the destination
 
-"retries" is one of the following:
+"number of retries" is one of the following:
 
   0          - No retries are performed
-  integer    - The number of retries to perform (if a 1 is passed, then the copy will be attempted a maximum of 2 times).  Must be a positive, whole number.
-  'infinite' - The string 'infinite' (and all other strings for that matter) will cause it to retry continuously until success
-# 
+  integer    - The number of retries to perform (if a 1 is passed, then the
+               copy will be attempted a maximum of 2 times).  Must be a
+               positive, whole number.
+  'infinite' - The string 'infinite' (and all other strings for that matter)
+               will cause it to retry continuously until success
+
 The default is 2 retries (or three attempts total).
 
-If called in a scalar context, it returns 0 for failure or 1 for success.  If called in a list context, the return value is a 1 or 0, followed by a list of error messages.  
+If called in a scalar context, it returns 0 for failure or 1 for success.  If
+called in a list context, the return value is a 1 or 0, followed by a list of
+error messages.
 
-The 'cp' and 'copy' named versions the function are not exported by default, and you must specify them explicitly to use them:
+The 'cp' and 'copy' named versions the function are not exported by default,
+and you must specify them explicitly to use them:
 
   use File::Copy::Vigilant qw(cp mv);
 
@@ -84,60 +91,72 @@ Or
 
 =cut
 
-sub copy_vigilant {
-    
-    my ($source, $dest, %params) = @_;
-    
-    my @errors = ();
-    my $success = eval {
+sub copy_vigilant
+{
 
-        my $retries = defined($params{'retries'}) ? $params{'retries'} : 2;
-        if ($retries !~ m/^\d+$/x) { $retries = 'infinite'; } # Blank = continuous
-    
-        my $check = defined($params{'check'}) ? lc($params{'check'}) : 'md5';
-        if ($check !~ m/^md5|size|compare|none$/x) { $check = 'md5'; }
-    
-        # This hook allows us to do some whitebox testing by modifying the
-        # results of the copy.  You probably don't want this unless you're
-        # testing this module.
-        my $postcopy = $params{'_postcopy'};
-        if (defined($postcopy) && ref($postcopy) ne 'CODE') {
-            $postcopy = undef;
-        }
+	my ( $source, $dest, %params ) = @_;
 
-        my $check_error = _check_files($source, $dest);
-        if ($check_error) {
-            push @errors, "Pre-copy check failed: $check_error\n";
-            return 0;
-        }
-        
-        my $attempt = 0;
-        while ( ($retries eq 'infinite') || ($attempt++ <= $retries) ) {
-            
-            my $copy_error = _try_copy($source, $dest, $check, $postcopy);
-            
-            if ($copy_error) {
-                push @errors, "Copy attempt $attempt failed: $copy_error\n";
-            }
-            else {
-                return 1;
-            }
-            
-        }
-        
-        # If we got here, then we looped as many times as we were allowed without a success
-        return 0;
-    
-    };
-    
-    if ($@) {
-        $success = 0;
-        push @errors, "Internal error in copy_vigilant: $@\n";
-    }
-    
-    return wantarray ? ( $success, @errors ) : $success;
-    
-}
+	my @errors  = ();
+	my $success = eval {
+
+		my $retries = defined( $params{'retries'} ) ? $params{'retries'} : 2;
+		if ( $retries !~ m/^\d+$/x )
+		{
+			$retries = 'infinite';
+		}    # Blank = continuous
+
+		my $check
+			= defined( $params{'check'} ) ? lc( $params{'check'} ) : 'md5';
+		if ( $check !~ m/^md5|size|compare|none$/x ) { $check = 'md5'; }
+
+		# This hook allows us to do some whitebox testing by modifying the
+		# results of the copy.  You probably don't want this unless you're
+		# testing this module.
+		my $postcopy = $params{'_postcopy'};
+		if ( defined($postcopy) && ref($postcopy) ne 'CODE' )
+		{
+			$postcopy = undef;
+		}
+
+		my $check_error = _check_files( $source, $dest );
+		if ($check_error)
+		{
+			push @errors, "Pre-copy check failed: $check_error\n";
+			return 0;
+		}
+
+		my $attempt = 0;
+		while ( ( $retries eq 'infinite' ) || ( $attempt++ <= $retries ) )
+		{
+
+			my $copy_error = _try_copy( $source, $dest, $check, $postcopy );
+
+			if ($copy_error)
+			{
+				push @errors, "Copy attempt $attempt failed: $copy_error\n";
+			}
+			else
+			{
+				return 1;
+			}
+
+		}
+
+		# If we got here, then we looped as many times as
+		# we were allowed without a success
+		return 0;
+
+	};
+
+	if ($@)
+	{
+		$success = 0;
+		push @errors, "Internal error in copy_vigilant: $@\n";
+	}
+
+	return wantarray ? ( $success, @errors ) : $success;
+
+} ## end sub copy_vigilant
 
 # Syntax borrowed from core module File::Copy
 sub cp;
@@ -146,130 +165,167 @@ sub cp;
 sub copy;
 *copy = \&copy_vigilant;
 
-sub _check_files {
-    
-    my ($source, $dest) = @_;
+sub _check_files
+{
 
-    if ( ref $source ) {
-        if ( ref($source) eq 'GLOB' || eval{$source->isa('GLOB')} || eval{$source->isa('IO::Hanlde')} ) {
-            return "can't use filehandle for source with __PACKAGE__::copy_vigilant";
-        }
-    }
-    elsif (ref(\$source) eq 'GLOB') {
-        return "can't use filehandle for source with __PACKAGE__::copy_vigilant";
-    }
-    
-    if ( ref $dest ) {
-        if ( ref($dest) eq 'GLOB' || eval{$dest->isa('GLOB')} || eval{$dest->isa('IO::Hanlde')} ) {
-            return "Can't use filehandle for desination with __PACKAGE__::copy_vigilant";
-        }
-    }
-    elsif (ref(\$dest) eq 'GLOB') {
-        return "can't use filehandle for destination with __PACKAGE__::copy_vigilant";
-    }
+	my ( $source, $dest ) = @_;
 
-    unless (stat $source) {
-        return "unable to stat source file $source";
-    }
+	if ( ref $source )
+	{
+		if ( ref($source) eq 'GLOB' ||
+			eval { $source->isa('GLOB') } ||
+			eval { $source->isa('IO::Handle') } )
+		{
+			return "can't use filehandle for source";
+		}
+	}
+	elsif ( ref( \$source ) eq 'GLOB' )
+	{
+		return "can't use filehandle for source";
+	}
 
-    if (-d $source) {
-        return "unable to copy directory source $source";
-    }
-        
-    unless (-f $source || -l $source) {            
-        return "unable to copy non-file source $source";
-    }
-	
-    # If we got this far then both the source and dest look OK
-    return '';
-}
+	if ( ref $dest )
+	{
+		if ( ref($dest) eq 'GLOB' ||
+			eval { $dest->isa('GLOB') } ||
+			eval { $dest->isa('IO::Handle') } )
+		{
+			return "Can't use filehandle for desination";
+		}
+	}
+	elsif ( ref( \$dest ) eq 'GLOB' )
+	{
+		return "can't use filehandle for destination";
+	}
 
-sub _try_copy {
-    
-    my ($source, $dest, $check, $postcopy) = @_;
-    
-    my $source_md5  = undef;
-    my $source_size = undef;
-    if ($check eq 'md5') {
-        $source_md5 = file_md5_hex($source);
-    }
-    if (($check eq 'md5') || ($check eq 'size')) { 
-        $source_size = (stat $source)[7];
-    }
-    
-    unless (File::Copy::copy( $source, $dest )) {
-        return "copy failed: $!";
-    }
-            
-    defined($postcopy) && $postcopy->(@_);
-                    
-    my $dest_size = undef;
-    if ($check eq 'md5' || $check eq 'size') {
-        $dest_size = (stat $dest)[7];
-    }
-    
-    if ($check eq 'md5') {
-        if ($source_size != $dest_size) {
-            return "pre-md5 size check failed";
-        }
-        my $dest_md5 = file_md5_hex($dest);
-        if ($source_md5 ne $dest_md5) {
-            return "md5 check failed";
-        }
-    }
-    elsif ($check eq 'size') {
-        if ($source_size != $dest_size) {
-            return "size check failed";
-        }
-    }
-    elsif ($check eq 'compare') {
-        if (File::Compare::compare($source, $dest)) {
-            return "file compare failed";
-        }
-    }
-    
-    # If we got this far then the copy was a success!
-    return '';
-}
+	unless ( stat $source )
+	{
+		return "unable to stat source file $source";
+	}
 
-=head2 move_vigilant move mv
+	if ( -d $source )
+	{
+		return "unable to copy directory source $source";
+	}
 
-The syntax and behavior is exactly the same as copy_vigilant, except it perfoms an unlink as the last step.
+	unless ( -f $source || -l $source )
+	{
+		return "unable to copy non-file source $source";
+	}
 
-This is terribly inefficient compared to File::Copy's move, which in most cases is a simple filesystem rename.
+	# If we got this far then both the source and dest look OK
+	return '';
+} ## end sub _check_files
+
+sub _try_copy
+{
+
+	my ( $source, $dest, $check, $postcopy ) = @_;
+
+	my $source_md5  = undef;
+	my $source_size = undef;
+	if ( $check eq 'md5' )
+	{
+		$source_md5 = file_md5_hex($source);
+	}
+	if ( ( $check eq 'md5' ) || ( $check eq 'size' ) )
+	{
+		$source_size = ( stat $source )[7];
+	}
+
+	unless ( File::Copy::copy( $source, $dest ) )
+	{
+		return "copy failed: $!";
+	}
+
+	defined($postcopy) && $postcopy->(@_);
+
+	my $dest_size = undef;
+	if ( $check eq 'md5' || $check eq 'size' )
+	{
+		$dest_size = ( stat $dest )[7];
+	}
+
+	if ( $check eq 'md5' )
+	{
+		if ( $source_size != $dest_size )
+		{
+			return "pre-md5 size check failed";
+		}
+		my $dest_md5 = file_md5_hex($dest);
+		if ( $source_md5 ne $dest_md5 )
+		{
+			return "md5 check failed";
+		}
+	}
+	elsif ( $check eq 'size' )
+	{
+		if ( $source_size != $dest_size )
+		{
+			return "size check failed";
+		}
+	}
+	elsif ( $check eq 'compare' )
+	{
+		if ( File::Compare::compare( $source, $dest ) )
+		{
+			return "file compare failed";
+		}
+	}
+
+	# If we got this far then the copy was a success!
+	return '';
+} ## end sub _try_copy
+
+=head2 move_vigilant, move, mv
+
+The syntax and behavior is exactly the same as copy_vigilant, except it
+perfoms an unlink as the last step.
+
+This is terribly inefficient compared to File::Copy's move, which in most
+cases is a simple filesystem rename.
+
+'move' and 'mv' are not imported by default, you'll have to add them in
+the use syntax (see copy_vigilant for details).
 
 =cut
 
-sub move_vigilant {
+sub move_vigilant
+{
 
-    my ($source, $dest, %params) = @_;
-    
-    my ($copy_success, @copy_errors) = copy_vigilant( $source, $dest, %params );
-    
-    unless ($copy_success) {
-        return wantarray ? (0, @copy_errors) : 0;
-    }
-    
-	my @errors = ();
-    my $success = eval {
-        if (unlink $source) {
-            return 1;
-        }
-        else {
-            push @errors, "Unable to remove source $source (destination file $dest has been left in place)\n";
+	my ( $source, $dest, %params ) = @_;
+
+	my ( $copy_success, @copy_errors )
+	  = copy_vigilant( $source, $dest, %params );
+
+	unless ($copy_success)
+	{
+		return wantarray ? ( 0, @copy_errors ) : 0;
+	}
+
+	my @errors  = ();
+	my $success = eval {
+		if ( unlink $source )
+		{
+			return 1;
+		}
+		else
+		{
+			push @errors, "Unable to remove source $source "
+			  . "(destination file $dest has been left in place)\n";
 			return 0;
-        }
-    };
-    
-    if ($@) {
-        $success = 0;
-        push @errors, "Internal error in move_vigilant: $@\n";
-    }
-    
-    return wantarray ? ($success, @errors) : $success;
-    
-}
+		}
+	};
 
+	if ($@)
+	{
+		$success = 0;
+		push @errors, "Internal error in move_vigilant: $@\n";
+	}
+
+	return wantarray ? ( $success, @errors ) : $success;
+
+}
 
 # Syntax borrowed from core module File::Copy
 sub mv;
@@ -284,9 +340,12 @@ Anthony Kilna, C<< <anthony at kilna.com> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-file-copy-vigilant at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=File-Copy-Vigilant>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to
+C<bug-file-copy-vigilant at rt.cpan.org>,
+or through the web interface at
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=File-Copy-Vigilant>.
+I will be notified, and then you'll automatically be notified
+of progress on your bug as I make changes.
 
 
 =head1 SUPPORT
@@ -294,7 +353,6 @@ automatically be notified of progress on your bug as I make changes.
 You can find documentation for this module with the perldoc command.
 
     perldoc File::Copy::Vigilant
-
 
 You can also look for information at:
 
@@ -319,8 +377,9 @@ L<http://search.cpan.org/dist/File-Copy-Vigilant>
 =back
 
 
-=head1 ACKNOWLEDGEMENTS
+=head1 SEE ALSO
 
+File::Copy - File::Copy::Reliable
 
 =head1 COPYRIGHT & LICENSE
 
