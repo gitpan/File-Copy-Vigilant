@@ -19,7 +19,7 @@ name: File-Copy-Vigilant
 provides:
   File::Copy::Vigilant:
     file: lib/File/Copy/Vigilant.pm
-    version: 1.2
+    version: v1.2.1
 requires:
   Digest::MD5::File: 0
   File::Compare: 0
@@ -27,4 +27,4 @@ requires:
   perl: v5.6.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.2
+version: v1.2.1
